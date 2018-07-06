@@ -1,0 +1,191 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    <style>
+        table {
+            border-collapse: collapse;
+        }
+
+        table, th, td {
+            border: 1px solid black;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <table>
+        <thead>
+            <tr>
+                <th>頁面名稱</th>
+                <th>type</th>
+                <th>name</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>電錶清單</td>
+                <td>Meter_data</td>
+                <td>
+                    <ul>
+                        <li>現在耗電量(KW)</li>
+                    </ul>
+                </td>
+            </tr>
+            <tr>
+                <td>中央系統</td>
+                <td>Flow_data</td>
+                <td>
+                    <ul>
+                        <li>儲冰量</li>
+                    </ul>
+                </td>
+            </tr>
+
+            <tr>
+                <td>中央系統</td>
+                <td>temperature</td>
+                <td>t1 ~ t19</td>
+            </tr>
+            <tr>
+                <td>中央系統</td>
+                <td>Flow_status</td>
+                <td>F1 ~ F19</td>
+            </tr>
+            <tr>
+                <td>中央系統</td>
+                <td>
+                    equipment_status
+                </td>
+                <td>
+                    <ul>
+                        <li>冷卻泵浦(一)</li>
+                        <li>冷卻泵浦SP</li>
+                        <li>冷卻泵浦(二)</li>
+                    </ul>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <p>type: <input id="type" value="Meter_data" /></p>
+    <p>name: <input id="name" value="現在耗電量(KW)" /></p>
+    <p>
+        value:
+        <input id="min-value" value="20" style="width: 60px;" />
+        ~
+        <input id="max-value" value="30" style="width: 60px;" />
+    </p>
+    <p>每 <input id="second" value="2" type="number" style="width: 60px;" /> 秒發送一次訊息</p>
+    <p>
+        發送訊息方式 :
+        <label><input type="radio" name="way" value="api" checked />api</label>
+        <label><input type="radio" name="way" value="web" />web</label>
+    </p>
+
+    <button id="send">send</button>
+    <button id="stop">stop</button>
+    <p id="alert" style="display:none;">訊息發送中</p>
+    <p id="msg"></p>
+    <div style="border: 1px solid orange; padding: 2px;">
+        <p>教室:<input id="classroom" /></p>
+        <p>
+            <label>關閉(-1):<input type="radio" name="auto" value="-1" /></label>
+            <label>手動(0):<input type="radio" name="auto" value="0" /></label>
+            <label>自動(1):<input type="radio" name="auto" value="1" /></label>
+        </p>
+        <p>
+            <label>冷氣關閉(0):<input type="radio" name="acon" value="0" /></label>
+            <label>冷氣開啟(1):<input type="radio" name="acon" value="1" /></label>
+        </p>
+        <button id="send-classroom">send classroom</button>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+            integrity="sha256-3edrmyuQ0w65f8gfBsqowzjJe2iM6n0nKciPUp8y+7E="
+            crossorigin="anonymous"></script>
+    <script>
+        $(function () {
+            var protocol = location.protocol === "https:" ? "wss:" : "ws:";
+            var wsUri = protocol + "//" + window.location.host + '/CHUACSystemApi';
+            var socket = new WebSocket(wsUri);
+
+            socket.onopen = e => {
+                console.log("socket opened", e);
+            };
+
+            socket.onclose = function (e) {
+                console.log("socket closed", e);
+            };
+
+            socket.onmessage = function (e) {
+                console.log(e);
+            };
+
+            socket.onerror = function (e) {
+                console.error(e.data);
+            };
+
+            var timer;
+            var $alert = $('#alert');
+            var $msg = $('#msg');
+            $('button#send').click(function () {
+                $(this).prop('disabled', true);
+                var type = $('#type').val();
+                var name = $('#name').val();
+                var minValue = parseFloat($('#min-value').val());
+                var maxValue = parseFloat($('#max-value').val());
+                var second = parseInt($('#second').val(), 10);
+                var way = $('[name=way]:checked').val();
+                $alert.show();
+
+                timer = setInterval(function () {
+                    var currentValue = Math.floor(Math.random() * (maxValue - minValue + 1)) + minValue;
+                    $msg.text('send ' + currentValue);
+                    if (way === 'web') {
+                        const data = {
+                            type: type,
+                            name: name,
+                            value: currentValue,
+                            remark: 'send by web',
+                            createdAt: new Date()
+                        }
+                        socket.send(JSON.stringify(data));
+                    } else if (way === 'api') {
+                        var url =
+                            location.protocol + '//' +
+                            window.location.host +
+                            '/CHUACSystemApi/api/socket/report?type=' + type + '&name=' + name + '&value=' + currentValue;
+                        fetch(url);
+                    }
+
+                }, second * 1000);
+            });
+
+            $('button#stop').click(function () {
+                clearInterval(timer);
+                $alert.hide();
+                $msg.text('');
+                $('button#send').prop('disabled', false);
+            });
+
+            $('button#send-classroom').click(function () {
+                var classroom = $('#classroom').val();
+                var auto = $('[name=auto]:checked').val();
+                var acon = $('[name=acon]:checked').val();
+                var value = `${auto}_${acon}`;
+                var url =
+                    location.protocol + '//' +
+                    window.location.host +
+                    '/CHUACSystemApi/api/socket/report?type=classroom&name=' + classroom + '&value=' + value;
+                fetch(url);
+            });
+        });
+    </script>
+</body>
+</html>

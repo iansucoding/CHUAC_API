@@ -1,0 +1,38 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+</head>
+<body>
+    <p>到 F12 Console 看使用 WebSocket 接受到的訊息</p>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"
+            integrity="sha256-3edrmyuQ0w65f8gfBsqowzjJe2iM6n0nKciPUp8y+7E="
+            crossorigin="anonymous"></script>
+    <script>
+        $(function () {
+            var protocol = location.protocol === "https:" ? "wss:" : "ws:";
+            var wsUri = protocol + "//" + window.location.host + '/CHUACSystemApi';
+            var socket = new WebSocket(wsUri);
+
+            socket.onopen = e => {
+                console.log("socket opened", e);
+            };
+
+            socket.onclose = function (e) {
+                console.log("socket closed", e);
+            };
+
+            socket.onmessage = function (e) {
+                console.log(e);
+                var data = JSON.parse(e.data);
+                console.log(data);
+            };
+
+            socket.onerror = function (e) {
+                console.error(e.data);
+            };
+        });
+    </script>
+</body>
+</html>
